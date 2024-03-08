@@ -16,7 +16,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/metric/global"
+	"go.opentelemetry.io/otel/metric"
 )
 
 type identity struct {
@@ -117,9 +117,16 @@ func (tokenProvider *tokenProvider) refreshAADToken() error {
 		attribute.String("identity_type", tokenProvider.identity.indentityType),
 	}
 
+	metricAttributes := metric.WithAttributes(
+		attribute.String("audience", tokenProvider.identity.audience),
+		attribute.String("client_id", tokenProvider.identity.clientId),
+		attribute.String("tenant_id", tokenProvider.identity.tenantId),
+		attribute.String("identity_type", tokenProvider.identity.indentityType),
+	)
+
 	// Record metrics
 	// token_refresh_total{is_success}
-	meter := global.Meter(constants.SERVICE_TELEMETRY_KEY)
+	meter := otel.Meter(constants.SERVICE_TELEMETRY_KEY)
 	intrument, _ := meter.Int64Counter(constants.METRIC_TOKEN_REFRESH_TOTAL)
 
 	accessToken, err := tokenProvider.credentialClient.GetToken(ctx, *tokenProvider.options)
@@ -128,7 +135,7 @@ func (tokenProvider *tokenProvider) refreshAADToken() error {
 		span.SetAttributes(attributes...)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "failed to refresh token")
-		intrument.Add(ctx, 1, attributes...)
+		intrument.Add(ctx, 1, metricAttributes)
 
 		// Set last error so that this can be returned back when the token is requested
 		tokenProvider.lastError = err
@@ -140,7 +147,7 @@ func (tokenProvider *tokenProvider) refreshAADToken() error {
 	tokenProvider.lastError = nil
 
 	attributes = append(attributes, attribute.Bool("is_success", true))
-	intrument.Add(ctx, 1, attributes...)
+	intrument.Add(ctx, 1, metricAttributes)
 
 	tokenProvider.setToken(ctx, accessToken.Token)
 	tokenProvider.updateRefreshDuration(accessToken)
