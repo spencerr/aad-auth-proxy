@@ -1,7 +1,6 @@
 package token_provider
 
 import (
-	"aad-auth-proxy/certificate"
 	"aad-auth-proxy/constants"
 	"aad-auth-proxy/contracts"
 	"aad-auth-proxy/utils"
@@ -16,15 +15,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/metric"
 )
-
-type identity struct {
-	audience      string
-	clientId      string
-	tenantId      string
-	indentityType string
-}
 
 type tokenProvider struct {
 	token                            string
@@ -34,43 +25,16 @@ type tokenProvider struct {
 	refreshDuration                  time.Duration
 	credentialClient                 azcore.TokenCredential
 	options                          *policy.TokenRequestOptions
-	identity                         identity
 }
 
-func NewTokenProvider(audience string, config utils.IConfiguration, certManager *certificate.CertificateManager, logger contracts.ILogger) (contracts.ITokenProvider, error) {
-
+func NewTokenProvider(audience string, config utils.IConfiguration, logger contracts.ILogger) (contracts.ITokenProvider, error) {
 	if config == nil || logger == nil {
 		return nil, errors.New("NewTokenProvider: Required arguments canot be nil")
 	}
 
-	identityType := config.GetIdentityType()
-	aadClientId := config.GetAadClientId()
-	aadTenantId := config.GetAadTenantId()
 	userConfiguredDurationPercentage := config.GetAadTokenRefreshDurationInPercentage()
 
-	var cred azcore.TokenCredential
-	var err error
-
-	switch identityType {
-	case constants.SYSTEM_ASSIGNED:
-		cred, err = NewManagedIdentityTokenCredential("", logger)
-	case constants.USER_ASSIGNED:
-		if len(aadClientId) > 0 {
-			cred, err = NewManagedIdentityTokenCredential(aadClientId, logger)
-		} else {
-			logger.Error("Client ID not found for UserAssignedIdentity Auth", errors.New("No Client ID"))
-			return nil, errors.New("No Client ID")
-		}
-	case constants.AAD_APPLICATION:
-		if len(aadClientId) > 0 && len(aadTenantId) > 0 && certManager != nil {
-			cred, err = NewAzureADTokenCredential(aadTenantId, aadClientId, certManager, logger)
-		} else {
-			logger.Error("Required pararms not found for AAD App Auth", errors.New("AAD params missing"))
-			return nil, errors.New("AAD params missing")
-		}
-	default:
-		cred, err = azidentity.NewDefaultAzureCredential(nil)
-	}
+	cred, err := azidentity.NewDefaultAzureCredential(nil)
 
 	if err != nil {
 		return nil, err
@@ -83,12 +47,6 @@ func NewTokenProvider(audience string, config utils.IConfiguration, certManager 
 		userConfiguredDurationPercentage: userConfiguredDurationPercentage,
 		credentialClient:                 cred,
 		options:                          &policy.TokenRequestOptions{Scopes: []string{audience}},
-		identity: identity{
-			audience:      audience,
-			clientId:      aadClientId,
-			tenantId:      aadTenantId,
-			indentityType: identityType,
-		},
 	}
 
 	err = tokenProvider.refreshAADToken()
@@ -110,19 +68,7 @@ func (tokenProvider *tokenProvider) refreshAADToken() error {
 	defer span.End()
 
 	// Telemetry attributes
-	attributes := []attribute.KeyValue{
-		attribute.String("audience", tokenProvider.identity.audience),
-		attribute.String("client_id", tokenProvider.identity.clientId),
-		attribute.String("tenant_id", tokenProvider.identity.tenantId),
-		attribute.String("identity_type", tokenProvider.identity.indentityType),
-	}
-
-	metricAttributes := metric.WithAttributes(
-		attribute.String("audience", tokenProvider.identity.audience),
-		attribute.String("client_id", tokenProvider.identity.clientId),
-		attribute.String("tenant_id", tokenProvider.identity.tenantId),
-		attribute.String("identity_type", tokenProvider.identity.indentityType),
-	)
+	attributes := []attribute.KeyValue{}
 
 	// Record metrics
 	// token_refresh_total{is_success}
@@ -135,7 +81,7 @@ func (tokenProvider *tokenProvider) refreshAADToken() error {
 		span.SetAttributes(attributes...)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "failed to refresh token")
-		intrument.Add(ctx, 1, metricAttributes)
+		intrument.Add(ctx, 1)
 
 		// Set last error so that this can be returned back when the token is requested
 		tokenProvider.lastError = err
@@ -147,7 +93,7 @@ func (tokenProvider *tokenProvider) refreshAADToken() error {
 	tokenProvider.lastError = nil
 
 	attributes = append(attributes, attribute.Bool("is_success", true))
-	intrument.Add(ctx, 1, metricAttributes)
+	intrument.Add(ctx, 1)
 
 	tokenProvider.setToken(ctx, accessToken.Token)
 	tokenProvider.updateRefreshDuration(accessToken)
