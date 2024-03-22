@@ -15,7 +15,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/metric/global"
+	"go.opentelemetry.io/otel/metric"
 )
 
 // This manages token provider handler
@@ -77,20 +77,20 @@ func (handler *Handler) ProxyRequest(w http.ResponseWriter, r *http.Request) {
 	err := handler.checkTokenProvider(ctx)
 	if err != nil {
 		// Metric attributes
-		metricAttributes := []attribute.KeyValue{
+		metricAttributes := metric.WithAttributes(
 			attribute.String("target_host", r.URL.Host),
 			attribute.String("method", r.Method),
 			attribute.String("path", r.URL.Path),
 			attribute.String("user_agent", r.Header.Get("User-Agent")),
 			attribute.Int("status_code", http.StatusServiceUnavailable),
-		}
+		)
 
 		// Record metrics
 		// requests_total{target_host, method, path, user_agent, status_code}
-		requestCountMeter := global.Meter(constants.SERVICE_TELEMETRY_KEY)
+		requestCountMeter := otel.Meter(constants.SERVICE_TELEMETRY_KEY)
 		requestCountIntrument, err := requestCountMeter.Int64Counter(constants.METRIC_REQUESTS_TOTAL)
 		if err == nil {
-			requestCountIntrument.Add(ctx, 1, metricAttributes...)
+			requestCountIntrument.Add(ctx, 1, metricAttributes)
 		}
 
 		FailRequest(w, r, http.StatusServiceUnavailable, "AuthenticationTokenNotFound", ctx, err)
@@ -120,17 +120,18 @@ func (handler *Handler) ProxyRequest(w http.ResponseWriter, r *http.Request) {
 		}
 		// Record metrics
 		// request_duration_milliseconds{target_host, method, path, user_agent, status_code}
-		requestDurationMeter := global.Meter(constants.SERVICE_TELEMETRY_KEY)
+		requestDurationMeter := otel.Meter(constants.SERVICE_TELEMETRY_KEY)
 		requestDurationIntrument, err := requestDurationMeter.Int64Histogram(constants.METRIC_REQUEST_DURATION_MILLISECONDS)
 		if err == nil {
-			metricAttributes := []attribute.KeyValue{
+			metricAttributes := metric.WithAttributes(
+				attribute.String("target_host", handler.targetHost),
 				attribute.String("target_host", handler.targetHost),
 				attribute.String("method", r.Method),
 				attribute.String("path", r.URL.Path),
 				attribute.String("user_agent", r.Header.Get("User-Agent")),
 				attribute.Int("status_code", int(status_code)),
-			}
-			requestDurationIntrument.Record(ctx, duration, metricAttributes...)
+			)
+			requestDurationIntrument.Record(ctx, duration, metricAttributes)
 		}
 	}()
 

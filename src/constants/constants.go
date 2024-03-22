@@ -34,11 +34,6 @@ const (
 	ENCODING_GZIP         = "gzip"
 	ENCODING_DEFLATE_ZLIB = "zlib"
 
-	// Identity
-	SYSTEM_ASSIGNED = "systemassigned"
-	USER_ASSIGNED   = "userassigned"
-	AAD_APPLICATION = "aadapplication"
-
 	// Error Response Headers
 	ERROR_PROPERTY_CODE    = "code"
 	ERROR_PROPERTY_MESSAGE = "message"

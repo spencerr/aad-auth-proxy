@@ -11,11 +11,7 @@ import (
 )
 
 type IConfiguration interface {
-	GetAadClientId() string
-	GetAadClientCertPath() string
-	GetAadTenantId() string
 	GetAadTokenRefreshDurationInPercentage() uint8
-	GetIdentityType() string
 	GetListeningPort() string
 	GetAudience() string
 	GetTargetHost() string
@@ -33,10 +29,6 @@ type configuration struct {
 }
 
 type identityConfiguration struct {
-	identityType                        string
-	aadClientId                         string
-	aadClientCertificatePath            string
-	aadTenantId                         string
 	aadTokenRefreshDurationInPercentage uint8
 }
 
@@ -60,17 +52,13 @@ func NewConfiguration() *configuration {
 	config := readConfigurationsFromEnv()
 
 	fields := log.Fields{
-		"AAD_CLIENT_ID":                            config.identityConfig.aadClientId,
-		"AAD_TENANT_ID":                            config.identityConfig.aadTenantId,
-		"AAD_CLIENT_CERTIFICATE_PATH":              config.identityConfig.aadClientCertificatePath,
 		"AAD_TOKEN_REFRESH_INTERVAL_IN_PERCENTAGE": config.identityConfig.aadTokenRefreshDurationInPercentage,
-		"IDENTITY_TYPE":                            config.identityConfig.identityType,
-		"LISTENING_PORT":                           config.listeningPort,
-		"AUDIENCE":                                 config.hostConfig.audience,
-		"TARGET_HOST":                              config.hostConfig.targetHost,
-		"OTEL_SERVICE_NAME":                        config.telemetryConfig.otelServiceName,
-		"OTEL_GRPC_ENDPOINT":                       config.telemetryConfig.otelEndpoint,
-		"OVERRIDE_REQUEST_HEADERS":                 config.additionalHeaders.headersStr,
+		"LISTENING_PORT":           config.listeningPort,
+		"AUDIENCE":                 config.hostConfig.audience,
+		"TARGET_HOST":              config.hostConfig.targetHost,
+		"OTEL_SERVICE_NAME":        config.telemetryConfig.otelServiceName,
+		"OTEL_GRPC_ENDPOINT":       config.telemetryConfig.otelEndpoint,
+		"OVERRIDE_REQUEST_HEADERS": config.additionalHeaders.headersStr,
 	}
 
 	if config.listeningPort == "" {
@@ -85,18 +73,13 @@ func NewConfiguration() *configuration {
 // Reads configurations from environment variables.
 func readConfigurationsFromEnv() *configuration {
 
-	aadClientId := os.Getenv("AAD_CLIENT_ID")
-	aadClientCertificatePath := os.Getenv("AAD_CLIENT_CERTIFICATE_PATH")
-	aadTenantId := os.Getenv("AAD_TENANT_ID")
 	aadTokenRefreshDurationInPercentageStr := os.Getenv("AAD_TOKEN_REFRESH_INTERVAL_IN_PERCENTAGE")
-	identityType := os.Getenv("IDENTITY_TYPE")
 	listeningPort := os.Getenv("LISTENING_PORT")
 	otelServiceName := os.Getenv("OTEL_SERVICE_NAME")
 	otelEndpoint := os.Getenv("OTEL_GRPC_ENDPOINT")
 	headersStr := os.Getenv("OVERRIDE_REQUEST_HEADERS")
 
 	// Identity
-	identityType = strings.ToLower(identityType)
 	var aadTokenRefreshDurationInPercentage uint8 = constants.DEFAULT_TOKEN_REFRESH_PERCENTAGE
 
 	// Parse refresh interval if passed as parameter
@@ -116,10 +99,6 @@ func readConfigurationsFromEnv() *configuration {
 	}
 
 	identityConfig := &identityConfiguration{
-		identityType:                        identityType,
-		aadClientId:                         aadClientId,
-		aadClientCertificatePath:            aadClientCertificatePath,
-		aadTenantId:                         aadTenantId,
 		aadTokenRefreshDurationInPercentage: aadTokenRefreshDurationInPercentage,
 	}
 
@@ -189,24 +168,8 @@ func parseHeaders(headersStr string) *additionalHeaders {
 	}
 }
 
-func (config *configuration) GetAadClientId() string {
-	return config.identityConfig.aadClientId
-}
-
-func (config *configuration) GetAadClientCertPath() string {
-	return config.identityConfig.aadClientCertificatePath
-}
-
-func (config *configuration) GetAadTenantId() string {
-	return config.identityConfig.aadTenantId
-}
-
 func (config *configuration) GetAadTokenRefreshDurationInPercentage() uint8 {
 	return config.identityConfig.aadTokenRefreshDurationInPercentage
-}
-
-func (config *configuration) GetIdentityType() string {
-	return config.identityConfig.identityType
 }
 
 func (config *configuration) GetListeningPort() string {

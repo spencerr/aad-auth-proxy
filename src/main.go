@@ -1,7 +1,6 @@
 package main
 
 import (
-	"aad-auth-proxy/certificate"
 	"aad-auth-proxy/constants"
 	"aad-auth-proxy/contracts"
 	"aad-auth-proxy/handler"
@@ -80,19 +79,10 @@ func main() {
 
 // Creates handler with token provider
 func createHandlerWithTokenProvider(configuration utils.IConfiguration, audience string, targetHost string, logger contracts.ILogger) *handler.Handler {
-	var certManager *certificate.CertificateManager
 	var err error
 
-	// Create cert manager for AAD based authentication
-	if configuration.GetIdentityType() == constants.AAD_APPLICATION {
-		certManager, err = certificate.NewCerificateManager(configuration.GetAadClientCertPath())
-		if err != nil {
-			logger.Error("NewCertificateManager failed: ", err)
-		}
-	}
-
 	// Create TokenProvider
-	tokenProvider, err := token_provider.NewTokenProvider(audience, configuration, certManager, logger)
+	tokenProvider, err := token_provider.NewTokenProvider(audience, configuration, logger)
 	if err != nil {
 		logger.Error("TokenCredential creation failed:", err)
 	}
